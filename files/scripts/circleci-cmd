@@ -1,0 +1,2 @@
+#!/bin/bash
+echo "docker run -v /home/ubuntu/.ssh:/tmp/ssh -v \$PWD:/work -e MASTER=$MASTER -e TAG=$TAG bluebeluga/mkdocs deploy \"build \$CIRCLE_BUILD_NUM\""

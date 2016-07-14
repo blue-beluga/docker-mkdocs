@@ -1,0 +1,65 @@
+#!/bin/bash
+set -ex
+
+branch="$(git rev-parse --abbrev-ref HEAD)"
+master="${MASTER:-master}"
+tag="$TAG"
+
+cp -r "$PWD" /tmp/project
+mkdocs build
+cp -r site /tmp/site
+
+if [[ -d /tmp/ssh ]]; then
+  rm -rf /root/.ssh
+  cp -r /tmp/ssh /root/.ssh
+  chown -R root /root/.ssh
+fi
+
+if ! git fetch --depth=1 origin gh-pages; then
+  git checkout --orphan gh-pages
+  git rm --cached -rf .
+  cp /tmp/gh-pages/* .
+  ls -1 /tmp/gh-pages | xargs git add
+else
+  git stash # removes any changed files
+  git checkout --track origin/gh-pages
+fi
+
+rm -rf "$branch"
+mv /tmp/site "$branch"
+git add "$branch"
+
+if [[ "$branch" == "$master" ]]; then
+  rm -rf latest
+  cp -r "$branch" latest
+  git add latest
+  if [[ -f latest/homepage.html ]]; then
+    git mv latest/homepage.html index.html
+  else
+    rm -rf index.html
+    cp /tmp/gh-pages/index.html .
+    git add index.html
+  fi
+  latest="$branch"
+fi
+
+if [[ "$tag" ]]; then
+  rm -rf "$tag"
+  cp -r "$branch" "$tag"
+  git add "$tag"
+  if [[ "$branch" == "$master" ]]; then
+    latest="$tag"
+  fi
+fi
+
+if [[ "$latest" ]]; then
+  export LATEST="$latest"
+  sigil -i \
+    '{"latest": "{{ var "LATEST" }}", "versions": ["{{ dirs "." | drop "latest" | drop ".git" | drop "site" | drop "build" | join "\", \"" }}"]}' \
+    > versions.json
+  git add versions.json
+fi
+
+if git commit -m "$1"; then
+  git push origin gh-pages:gh-pages
+fi

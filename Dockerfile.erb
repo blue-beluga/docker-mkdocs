@@ -1,0 +1,23 @@
+# encoding: UTF-8
+
+FROM <%= ENV.fetch('FROM') %>
+MAINTAINER The Blue Beluga <admin@bluebeluga.io>
+ENV SIGIL_VERSION <%= ENV.fetch('SIGIL_VERSION') %>
+ENV SIGIL_SHA256 <%= ENV.fetch('SIGIL_SHA256') %>
+RUN apk-install --no-cache --virtual .build-deps curl \
+ && apk-install python py-pip bash openssh-client git \
+ && pip install --upgrade pip mkdocs pygments pymdown-extensions \
+ && git config --global user.email "admin@bluebeluga.io" \
+ && git config --global user.name "bluebeluga" \
+ && ln -s /root /home/ubuntu \
+ && curl -sSLO https://github.com/gliderlabs/sigil/releases/download/v${SIGIL_VERSION}/sigil_${SIGIL_VERSION}_Linux_x86_64.tgz \
+ && echo "${SIGIL_SHA256}  sigil_${SIGIL_VERSION}_Linux_x86_64.tgz" | sha256sum -c - \
+ && tar -xzf sigil_${SIGIL_VERSION}_Linux_x86_64.tgz -C /bin \
+ && rm sigil_${SIGIL_VERSION}_Linux_x86_64.tgz \
+ && apk del .build-deps curl \
+ && rm -rf /var/cache/apk/*
+ADD files/scripts/* /bin/
+ADD files/gh-pages /tmp/gh-pages
+ADD files/theme /mkdocs/theme
+WORKDIR /work
+EXPOSE 8000

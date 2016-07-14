@@ -1,0 +1,16 @@
+# encoding: UTF-8
+
+site_name: Docker MkDocs
+site_author: The Blue Beleuga
+site_description: Deploying a Multi-Container Voting Application on Kubernetes
+site_url: http://blue-beluga.github.io/docker-mkdocs/latest/
+repo_url: https://github.com/blue-beluga/docker-mkdocs.git
+repo_name: github.kp.org
+theme_dir: /mkdocs/theme
+dev_addr: 0.0.0.0:8000
+markdown_extensions:
+  - codehilite
+extra_css:
+- css/highlight-custom.cssdocker
+pages:
+  - Home: index.md
