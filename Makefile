@@ -68,8 +68,6 @@ export REGISTRY
 export FROM
 export TAG
 
-# Provides color text output. YL = yellow, GR = green, RD = red, MG = magenta,
-# CY = cyan and NC = no color.
 ifneq ($(USE_COLOR),0)
   YL = \033[0;33m
   GR = \033[0;32m
@@ -79,29 +77,25 @@ ifneq ($(USE_COLOR),0)
   NC = \033[0m
 endif
 
-# list of dependancies in the build context
-DEPS := $(shell find . -type f -print)
-DOCKER_IP := $(shell docker-machine ip $(docker-machine active))
-# Format the help text appropriately
 HELP_FMT := 'make $(YL)%-15s $(NC)\# %s\n'
 
 # Provide a way to shorten build arguments below.
 IMAGE_NAME = $(REPOSITORY):$(TAG)
-REPO       = $(REPOSITORY)
-REG        = $(REGISTRY)
-
+REPO = $(REPOSITORY)
+REG  = $(REGISTRY)
+#
 # ******************************************************************************
 # Define the actual usable targets.
 #
 help::
 	@printf $(HELP_FMT) 'task' 'Shows the current task info.'
 task::
-	@printf "$(YL)------------------------------------------------------------\n"
+	@printf "$(YL)-----------------------------------------------------------\n"
 	@printf "$(CY)%14s $(YL): $(GR)%-15s $(CY)%8s $(YL): $(GR)%-14s\n" \
-					"Repository" $(REPOSITORY) "Tag" $(TAG)
+							"Repository" $(REPOSITORY) "Tag" $(TAG)
 	@printf "$(CY)%14s $(YL): $(GR)%-15s $(CY)%8s $(YL): $(GR)%-14s\n" \
-					"Registry" $(REGISTRY) "Target" $(MAKECMDGOALS)
-	@printf "$(YL)------------------------------------------------------------\n"
+							"Registry" $(REGISTRY) "Target" $(MAKECMDGOALS)
+	@printf "$(YL)-----------------------------------------------------------\n"
 .PHONY:: task
 
 help::
@@ -116,34 +110,26 @@ push:: task build
 .PHONY:: push
 
 help::
-	@printf $(HELP_FMT) 'test' 'Run automated tests on one or more instances'
+	printf $(HELP_FMT) 'test' 'Run automated tests on one or more instances'
 test:: task build
 	set -e; if [ -f 'test/run.bats' ]; then bats -t test/run.bats; break; fi
 .PHONY:: test
 
 help::
-	@printf $(HELP_FMT) 'build' 'Build an image from a Dockerfile'
-build:: task stop .render .built
-.PHONY:: build .built
+	printf $(HELP_FMT) 'build' 'Build an image from a Dockerfile'
+build:: task stop .render .build
+.PHONY:: build .build
 
-.built:: . $(DEPS)
+.build:: . $(DEPS)
 	docker pull $(FROM)
 	docker build -t "$(REG)/$(REPO):$(TAG)" -f "versions/$(TAG)/Dockerfile" .
-	docker inspect -f '{{.Id}}' $(REG)/$(REPO):$(TAG) > "versions/$(TAG)/.built"
+	docker inspect -f '{{.Id}}' $(REG)/$(REPO):$(TAG) > "versions/$(TAG)/.build"
 ifeq "$(TAG)" "$(LATEST_TAG)"
 	docker tag "$(REG)/$(REPO):$(TAG)" "$(REG)/$(REPO):latest"
 endif
 
 help::
-	@printf $(HELP_FMT) 'run' 'Run MkDocs container on http://${DOCKER_IP}:8000'
-serve:: task stop build
-	@printf "\nConnect to MkDocs on $(YL)http://${DOCKER_IP}:8000$(NC)\n\n";
-	docker-machine ssh $(docker-machine active) "sync; sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'" || true
-	docker run --rm -it -p 8000:8000 -v $(PWD):/work "$(REPO):$(TAG)" mkdocs serve
-.PHONY:: serve
-
-help::
-	@printf $(HELP_FMT) 'stop' 'Gracefully stop a running container'
+	printf $(HELP_FMT) 'stop' 'Gracefully stop a running container'
 stop:: task
 ifneq ($(strip $(shell docker ps -aqf ancestor=$(IMAGE_NAME))),)
 	docker ps -aqf ancestor=$(IMAGE_NAME) | xargs docker stop
@@ -151,16 +137,16 @@ endif
 .PHONY:: stop
 
 help::
-	@printf $(HELP_FMT) 'clean' 'Stop and remove build artifacts and images'
+	printf $(HELP_FMT) 'clean' 'Stop and remove build artifacts and images'
 clean:: task stop
-	rm -f .render .built Dockerfile
+	rm -f .render .build Dockerfile
 	docker images -qa "$(REPO):$(TAG)" | xargs docker rmi -f
 	docker images -qa "$(REPO):latest" | xargs docker rmi -f
 
 # Per-tag Dockerfile target. Look for Dockerfile or Dockerfile.erb in the root,
 # and use it for $(TAG). We prioritize Dockerfile.erb over Dockerfile if both
 # are present.
-.render: Dockerfile.erb Dockerfile
+.render: $(TAG) Dockerfile.erb Dockerfile
 ifneq (,$(wildcard Dockerfile.erb))
 	erb "Dockerfile.erb" > "versions/$(TAG)/Dockerfile"
 else
@@ -180,5 +166,11 @@ ifneq (,$(wildcard Dockerfile))
 	$(warning You must create a Dockerfile.erb or Dockerfile)
 endif
 
+$(TAG):
+	mkdir -p "versions/$(TAG)"
+
+# list of dependancies in the build context
+DEPS = $(shell find versions/$(TAG) -type f -print)
+
 .PHONY:: push test build stop
-.DEFAULT_GOAL := help
+.DEFAULT_GOAL := test
